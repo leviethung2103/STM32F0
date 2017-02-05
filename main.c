@@ -3,63 +3,31 @@
   * File Name          : main.c
   * Description        : Main program body
   ******************************************************************************
-  *
-  * COPYRIGHT(c) 2017 STMicroelectronics
-  *
-  * Redistribution and use in source and binary forms, with or without modification,
-  * are permitted provided that the following conditions are met:
-  *   1. Redistributions of source code must retain the above copyright notice,
-  *      this list of conditions and the following disclaimer.
-  *   2. Redistributions in binary form must reproduce the above copyright notice,
-  *      this list of conditions and the following disclaimer in the documentation
-  *      and/or other materials provided with the distribution.
-  *   3. Neither the name of STMicroelectronics nor the names of its contributors
-  *      may be used to endorse or promote products derived from this software
-  *      without specific prior written permission.
-  *
-  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-  * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-  * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-  * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-  * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-  * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-  *
-  ******************************************************************************
   */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "stm32f0xx_hal.h"
 #include "string.h"
 #include "stdio.h"
-#define MESSAGE_SIZE 128	
 #define TIMEOUT 5000
 
 
-/* USER CODE BEGIN Includes */
-
-/* USER CODE END Includes */
-
 /* Private variables ---------------------------------------------------------*/
-UART_HandleTypeDef huart1;				// Debug
-UART_HandleTypeDef huart2;				// ESP8266
+UART_HandleTypeDef huart1;				// Debug  UART
+UART_HandleTypeDef huart2;				// ESP8266 UART
 
 char buffer[100];
 int len;
 
-char Rx_indx,i,Rx_Buffer[100], Rx_data[2];
+unsigned char i;
+char Rx_Buffer[100];
+char Rx_data[2];
+char Rx_indx;
 char Transfer_cplt;
 
+const char mySSID[]="PhongTro_plus";
+const char myPSK[]="12345678phongtro";
 
-
-
-/* USER CODE BEGIN PV */
-/* Private variables ---------------------------------------------------------*/
-
-/* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
@@ -67,93 +35,46 @@ void Error_Handler(void);
 static void MX_GPIO_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_USART2_UART_Init(void);
+static void ESP8266_Init(void);
+void UART_Print(char *msg);
+void AT(void);
+void AT_RST(void);
+void AT_GMR(void);
+void AT_CIFSR(void);
+void AT_CWJAP(void);
+void AT_CWMODE(void);
+
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
-	if(huart->Instance==USART2)
-	{
-		if (Rx_indx==0) 
-		{	
-			for (i=0;i<100;i++)
-				Rx_Buffer[i]=0;
-		}
-		if (Rx_data[0] !=10)
-		{
-			Rx_Buffer[Rx_indx++] = Rx_data[0];	// add data to Rx_buffer
-		}
-		else 
-		{
-			Rx_indx=0;
-			Transfer_cplt=1;		// transfer complete	
-		}
-			HAL_UART_Receive_IT(&huart2, (uint8_t *)Rx_data, 1);
-	}	
-}	
-
-void UART_Print(char *msg)
-{	
-	char log[MESSAGE_SIZE]= "";
-	strcat(log,msg); 			// ghep chuoi nguon vao sau chuoi dich
-	strcat(log,"\r\n");				// ghep them \r\n
-
-	HAL_UART_Transmit(&huart1, (uint8_t*) log, sizeof(log)-1, TIMEOUT);
 	
+	if(huart->Instance==USART2)
+	{	
+		
+		if (Rx_indx ==0)
+		{
+			for (i=0; i<100;i++) 
+			Rx_Buffer[i]=0;
+		} 
+		Rx_Buffer[Rx_indx++]=Rx_data[0];	
+		for (i=2;i<100;i++)
+		{
+				if((Rx_Buffer[i-1]=='O') && (Rx_Buffer[i-0]=='K'))
+				{
+					Transfer_cplt=1;
+				}	
+		}
+				
+	
+		HAL_UART_Receive_IT(&huart2, (uint8_t *)Rx_data, 1);
+	
+	
+	}
 }	
-
-void AT(void) 
-{
-	char AT[]="AT\r\n";
-	UART_Print("AT");
-	HAL_UART_Transmit(&huart2, (uint8_t *) AT, sizeof(AT)-1, TIMEOUT);
-	HAL_Delay(1000);
-} 
-
-void AT_RST(void)
-{
-	char AT_RST[]="AT+RST\r\n";
-	UART_Print("AT+RST");
-	HAL_UART_Transmit(&huart2, (uint8_t *) AT_RST, sizeof(AT_RST)-1, TIMEOUT);
-	HAL_Delay(1000);
-}
-void AT_GMR(void)
-{
-	char AT_GMR[]="AT+GMR\r\n";
-	UART_Print("AT+GMR");
-	if (HAL_UART_Transmit(&huart2, (uint8_t *) AT_GMR, sizeof(AT_GMR)-1, TIMEOUT) != HAL_OK)
-	{
-		UART_Print("Send fail");
-	}	
-	HAL_Delay(1000);
-}
-
-void AT_CIFSR(void)
-{
-	char AT_CIFSR[]="AT+CIFSR\r\n";
-	UART_Print("AT+CIFSR");
-	HAL_UART_Transmit(&huart2, (uint8_t *) AT_CIFSR, sizeof(AT_CIFSR)-1, TIMEOUT);
-	HAL_Delay(1000);
-}	
-
-void AT_CWJAP(void)
-{
-	char AT_CWJAP[]="AT+CWJAP=\"PhongTro_plus\",\"12345678phongtro\"\r\n";
-	UART_Print("AT+CWJAP");
-	HAL_UART_Transmit(&huart2, (uint8_t *) AT_CWJAP, sizeof(AT_CWJAP)-1, TIMEOUT);
-	HAL_Delay(1000);
-}	
-
-
-
 
 
 int main(void)
 {
-
-  /* USER CODE BEGIN 1 */
-
-  /* USER CODE END 1 */
-
-  /* MCU Configuration----------------------------------------------------------*/
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
   HAL_Init();
@@ -168,23 +89,21 @@ int main(void)
 
   /* USER CODE BEGIN 2 */
 	HAL_UART_Receive_IT(&huart2, (uint8_t *)Rx_data, 1);
- 
+
 	
-	AT();
-	AT_CWJAP();	
-	while (1)
-  {
-	
-	AT_CIFSR(); 
 		
-	if (Transfer_cplt==1)
-	{
-//				sprintf(buffer,"%s\r\n",Rx_Buffer);
-//				len=strlen(buffer);
-//				HAL_UART_Transmit(&huart1, (uint8_t *) buffer,len, 100);
-			UART_Print(Rx_Buffer);
+	ESP8266_Init();
+	
+	while (1)
+  {		
+		if(Transfer_cplt)
+		{
+			sprintf(buffer,"%s",Rx_Buffer);			// MUST HAVE
+			HAL_UART_Transmit(&huart1, (uint8_t*) buffer,strlen(buffer),1000);			// MUST HAVE
 			Transfer_cplt=0;
-	}
+			Rx_indx=0;													// MUST HAVE
+
+		}	
   }
   /* USER CODE END 3 */
 
@@ -315,10 +234,68 @@ static void MX_GPIO_Init(void)
 
 }
 
-/* USER CODE BEGIN 4 */
+static void ESP8266_Init(void)
+{
+	AT();
+	AT_CWJAP();
+	AT_GMR();
+}	
 
-/* USER CODE END 4 */
+void AT(void)
+{
+	char AT[]="AT\r\n";
+	HAL_UART_Transmit(&huart2, (uint8_t *) AT, sizeof(AT)-1, TIMEOUT);
+	HAL_Delay(1000);			// MUST HAVE
+} 
 
+void AT_RST(void)
+{
+	char AT_RST[]="AT+RST\r\n";
+	HAL_UART_Transmit(&huart2, (uint8_t *) AT_RST, sizeof(AT_RST)-1, TIMEOUT);
+	HAL_Delay(1000);
+}
+void AT_GMR(void)
+{
+	char AT_GMR[]="AT+GMR\r\n";
+	HAL_UART_Transmit(&huart2, (uint8_t *) AT_GMR, sizeof(AT_GMR)-1, TIMEOUT);
+	HAL_Delay(1000);
+}
+
+void AT_CIFSR(void)
+{
+	char AT_CIFSR[]="AT+CIFSR\r\n";
+	HAL_UART_Transmit(&huart2, (uint8_t *) AT_CIFSR, sizeof(AT_CIFSR)-1, TIMEOUT);
+	HAL_Delay(1000);
+}	
+
+void AT_CWJAP(void)
+{
+	
+	  char AT_CWJAP[100];
+    strcpy(AT_CWJAP,"AT+CWJAP=\"");
+    strcat(AT_CWJAP,mySSID);
+    strcat(AT_CWJAP,"\",\"");
+    strcat(AT_CWJAP,myPSK);
+    strcat(AT_CWJAP,"\"\r\n");	
+	
+	HAL_UART_Transmit(&huart2, (uint8_t *) AT_CWJAP, sizeof(AT_CWJAP)-1, TIMEOUT);
+	HAL_Delay(1000);
+}	
+
+void AT_CWMODE(void)
+{	
+	char AT_CWMODE[]="AT+CWMODE=3\r\n";
+	HAL_UART_Transmit(&huart2, (uint8_t *) AT_CWMODE, sizeof(AT_CWMODE)-1, TIMEOUT);
+}
+void UART_Print(char *msg)
+{	
+	char log[MESSAGE_SIZE]= "";
+	strcat(log,msg); 			// ghep chuoi nguon vao sau chuoi dich
+	strcat(log,"\r\n");				// ghep them \r\n
+
+	HAL_UART_Transmit(&huart1, (uint8_t*) log, (sizeof(log))-1, TIMEOUT);
+	
+}	
 /**
   * @brief  This function is executed in case of error occurrence.
   * @param  None
